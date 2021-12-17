@@ -1,9 +1,9 @@
 /* features
  + turn function components into a tree struct for drawing
  + draw the tree struct to a canvas
- - add zoom controls to scale everything based on font size
- - support multiple useState in a single component
+ + support multiple useState in a single component
  - support deeper nesting of components
+ - add zoom controls to scale everything based on font size
  dispatch click
    - find the deepest node under the cursor
    - send to child or up the tree for mouse clicks
@@ -11,22 +11,32 @@
  - button control. set x&y&text. w&h calculated from text. single default font.
 */
 
-// ============== framework
+// general utils
 function l(...args) {
     console.log("LOG",...args)
 }
 
+// general tree stuff
+function findNodeWithProp(node, name) {
+    // console.log('find prop',node,name)
+    if(node.props && node.props.hasOwnProperty(name)) return node
+    if(node.props.children) return node.props.children.find(child => findNodeWithProp(child,name))
+    return undefined
+}
+
+// ============== framework
 const CANVAS_NODE = Symbol("CanvasNode")
 
 class RenderState {
-    constructor(prev) {
+    constructor(prev_tree) {
         this.dirty = false
-        this.prev = prev
+        this.prev_tree = prev_tree
+        this.cur = null
         this.stack = []
     }
     push(state) {
-        if(this.prev && this.prev.tree) {
-            let pn = this.prev.tree
+        if(this.prev_tree && this.prev_tree.tree) {
+            let pn = this.prev_tree.tree
             state.merge_previous(pn)
         }
         this.stack.push(state)
@@ -47,7 +57,6 @@ class RenderState {
     }
 }
 let RENDER_STATE = null
-
 
 class NodeState {
     constructor(name) {
@@ -72,34 +81,19 @@ class NodeState {
 
 function Render(fun,props) {
     if(fun === CANVAS_NODE) return {type:"CANVAS_NODE",props:props}
-    // l(`call '${fun.name}' `,props)
     RENDER_STATE.push(new NodeState(fun.name))
     let ret = fun(props)
-    // RENDER_STATE.dump()
     if(!ret) throw new Error(`function ${fun.name} returns empty`)
     ret.state = RENDER_STATE.pop()
     return ret
 }
 
-function findProp(node, name) {
-    // console.log('find prop',node,name)
-    if(node.props && node.props.hasOwnProperty(name)) {
-        return node
-    }
-    if(node.props.children) {
-        return node.props.children.find(child => findProp(child,name))
-    }
-    return undefined
-}
-
 function RenderTree(prev,fun,props) {
     RENDER_STATE = new RenderState(prev)
     let tree = Render(fun,props)
-    // l("return tree is",tree)
     return {
         send_click:(pt) => {
-            l("sending a click at",pt)
-            let click_node = findProp(tree,'click')
+            let click_node = findNodeWithProp(tree,'click')
             if(click_node) click_node.props.click()
         },
         tree:tree,
@@ -187,7 +181,6 @@ function browserToCanvas(e) {
 function greetings({title, w=30, h=30}) {
     const [foo, setFoo] = useState(()=>"foo")
     const [count, setCount] = useState(()=>66)
-    l("greetings with",foo,count)
     return Render(Group,{
         x:20,
         y:20,
