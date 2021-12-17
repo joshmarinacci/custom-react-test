@@ -27,18 +27,17 @@ class RenderState {
     push(state) {
         if(this.prev && this.prev.tree) {
             let pn = this.prev.tree
-            // console.log("pushed with",state)
-            // console.log("prev is",pn)
-            state.state = pn.state
+            state.merge_previous(pn)
         }
-        if(!state.state) state.state = {}
         this.stack.push(state)
     }
     current() {
         return this.stack[this.stack.length-1]
     }
     pop() {
-        return this.stack.pop()
+        let state = this.stack.pop()
+        state.pop()
+        return state
     }
     dump() {
         l("\n=== RenderState",this.stack,'\n===')
@@ -53,6 +52,21 @@ let RENDER_STATE = null
 class NodeState {
     constructor(name) {
         this.name = name
+        this.state = {}
+        this.state.count = -1
+        this.state.states = []
+    }
+    pop() {
+        // console.log("fixing state count")
+        this.state.count = -1
+    }
+    merge_previous(pn) {
+        // console.log("merging from previous",pn)
+        if(pn.state.name !== this.name) {
+            console.log("cant merge from different node")
+            return
+        }
+        this.state.states = pn.state.state.states
     }
 }
 
@@ -95,12 +109,18 @@ function RenderTree(prev,fun,props) {
 
 function useState(val) {
     let node = RENDER_STATE.current()
-    if(!node.state.state_val) node.state.state_val = val()
+    node.state.count+=1
+    let count = node.state.count
+    let cval = node.state.states[count]
+    if(!cval) {
+        node.state.states[count] = val()
+        cval = node.state.states[count]
+    }
     let set_val = (new_val) => {
-        node.state_val = new_val
+        node.state.states[count] = new_val
         RENDER_STATE.dirty = true
     }
-    return [ node.state.state_val, set_val ]
+    return [ node.state.states[count], set_val ]
 }
 
 function Text({title, click=null}) {
@@ -166,14 +186,19 @@ function browserToCanvas(e) {
 
 function greetings({title, w=30, h=30}) {
     const [foo, setFoo] = useState(()=>"foo")
+    const [count, setCount] = useState(()=>66)
+    l("greetings with",foo,count)
     return Render(Group,{
         x:20,
         y:20,
         children:[
             Render(background, {w,h}),
             Render(Text,{
-                title:`Greetings ${title} and foo=${foo}`,
-                click:()=>setFoo((foo==="bar")?"foo":"bar")
+                title:`Greetings ${title} and foo=${foo} count=${count}`,
+                click:()=>{
+                    setCount(count+1)
+                    setFoo((foo==="bar")?"foo":"bar")
+                }
             }),
         ]
     })
