@@ -13,6 +13,7 @@ function l(...args) {
 
 const TEXT = Symbol("Text")
 const RECT = Symbol("Rect")
+const GROUP = Symbol("Group")
 
 class RenderState {
     constructor(prev) {
@@ -65,6 +66,12 @@ function Render(fun,props) {
             props:props,
         }
     }
+    if(fun === GROUP) {
+        return {
+            type:"GROUP",
+            props:props,
+        }
+    }
     // l(`call '${fun.name}' `,props)
     RENDER_STATE.push(new NodeState(fun.name))
     let ret = fun(props)
@@ -75,11 +82,12 @@ function Render(fun,props) {
 }
 
 function findProp(node, name) {
+    // console.log('find prop',node,name)
     if(node.props && node.props.hasOwnProperty(name)) {
-        return node.props[name]
+        return node
     }
-    if(node.children) {
-        return node.children.find(child => findProp(child,name))
+    if(node.props.children) {
+        return node.props.children.find(child => findProp(child,name))
     }
     return undefined
 }
@@ -90,10 +98,10 @@ function RenderTree(prev,fun,props) {
     let tree = Render(fun,props)
     // l("return tree is",tree)
     return {
-        sim_click:(x,y) => {
-            l("simulating a click at",x,y)
-            let click = findProp(tree,'click')
-            if(click) click()
+        send_click:(x,y) => {
+            l("sending a click at",x,y)
+            let click_node = findProp(tree,'click')
+            if(click_node) click_node.props.click()
         },
         tree:tree,
         state:RENDER_STATE
@@ -116,6 +124,9 @@ function Text({title, click=null}) {
 
 function Rect({x=0,y=0,w=10,h=10,fill='red'}) {
     return Render(RECT,{x,y,w,h,fill})
+}
+function Group({x=0, y=0, children=[]}) {
+    return Render(GROUP,{x,y,children})
 }
 
 
@@ -143,10 +154,16 @@ function Rect({x=0,y=0,w=10,h=10,fill='red'}) {
 
 function greetings({title}) {
     const [foo, setFoo] = useState(()=>"foo")
-    // console.log("rendering greetings with foo",foo)
-    return Render(Text,{
-        title:`Greetings ${title} and foo=${foo}`,
-        click:()=>setFoo("bar")
+    return Render(Group,{
+        x:20,
+        y:20,
+        children:[
+            Render(background),
+            Render(Text,{
+                title:`Greetings ${title} and foo=${foo}`,
+                click:()=>setFoo((foo==="bar")?"foo":"bar")
+            }),
+        ]
     })
 }
 
@@ -165,7 +182,18 @@ function draw_node(canvas,c,node) {
         c.fillStyle = 'black'
         c.fillText(node.props.text,20,30)
     }
+    if(node.type === 'RECT') {
+        c.fillStyle = node.props.fill
+        c.fillRect(node.props.x,node.props.y,node.props.w,node.props.h)
+    }
+    if(node.type === "GROUP") {
+        c.save()
+        c.translate(node.props.x,node.props.y)
+        node.props.children.forEach(ch => draw_node(canvas,c,ch))
+        c.restore()
+    }
 }
+
 function draw_canvas(canvas,results) {
     console.log('drawing canvas',results)
     let c = canvas.getContext('2d')
@@ -182,8 +210,7 @@ function draw_canvas(canvas,results) {
     let results = RenderTree(null,greetings, {title: "Earthling"})
     draw_canvas(canvas,results)
     on(canvas,'click',() => {
-        console.log("canvas clicked")
-        results.sim_click(5,5)
+        results.send_click(5,5)
         if(results.state.isDirty()) {
             results = RenderTree(results,greetings,{title:"Earthling"})
             draw_canvas(canvas,results)
