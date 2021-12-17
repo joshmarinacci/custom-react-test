@@ -98,8 +98,8 @@ function RenderTree(prev,fun,props) {
     let tree = Render(fun,props)
     // l("return tree is",tree)
     return {
-        send_click:(x,y) => {
-            l("sending a click at",x,y)
+        send_click:(pt) => {
+            l("sending a click at",pt)
             let click_node = findProp(tree,'click')
             if(click_node) click_node.props.click()
         },
@@ -152,13 +152,13 @@ function Group({x=0, y=0, children=[]}) {
 */
 
 
-function greetings({title}) {
+function greetings({title, w=30, h=30}) {
     const [foo, setFoo] = useState(()=>"foo")
     return Render(Group,{
         x:20,
         y:20,
         children:[
-            Render(background),
+            Render(background, {w,h}),
             Render(Text,{
                 title:`Greetings ${title} and foo=${foo}`,
                 click:()=>setFoo((foo==="bar")?"foo":"bar")
@@ -167,12 +167,12 @@ function greetings({title}) {
     })
 }
 
-function background() {
+function background({w=100,h=100}) {
     return Render(Rect,{
         x:5,
         y:5,
-        w:100,
-        h:100,
+        w:w,
+        h:h,
     })
 }
 
@@ -202,17 +202,34 @@ function draw_canvas(canvas,results) {
     draw_node(canvas,c,results.tree)
 }
 
+class Point {
+    constructor(x, y) {
+        this.x = x
+        this.y = y
+    }
+    subtract(pt) {
+        return new Point(this.x-pt.x,this.y-pt.y)
+    }
+
+}
+
+function browserToCanvas(e) {
+    let pt = new Point(e.clientX, e.clientY)
+    let rect = e.target.getBoundingClientRect()
+    return pt.subtract(new Point(rect.x,rect.y))
+}
+
 {
     const $ = (sel) => document.querySelector(sel)
     const on = (el,type,cb) => el.addEventListener(type,cb)
 
     const canvas = $("canvas")
-    let results = RenderTree(null,greetings, {title: "Earthling"})
+    let results = RenderTree(null,greetings, {title: "Earthling", w:300, h: 200})
     draw_canvas(canvas,results)
-    on(canvas,'click',() => {
-        results.send_click(5,5)
+    on(canvas,'click',(e) => {
+        results.send_click(browserToCanvas(e))
         if(results.state.isDirty()) {
-            results = RenderTree(results,greetings,{title:"Earthling"})
+            results = RenderTree(results,greetings,{title:"Earthling",w:300, h:200})
             draw_canvas(canvas,results)
         }
     })
