@@ -1,10 +1,15 @@
-// features
-// turn function components into a tree struct for drawing
-// draw the tree struct to a canvas
-// useState and useEffect trigger updates
-// minimal state for areas of interest for mouse events
-// +/- to zoom the entire UI
-// all position and size values in rems based on base font size
+/* features
+ + turn function components into a tree struct for drawing
+ + draw the tree struct to a canvas
+ - add zoom controls to scale everything based on font size
+ - support multiple useState in a single component
+ - support deeper nesting of components
+ dispatch click
+   - find the deepest node under the cursor
+   - send to child or up the tree for mouse clicks
+   - needs a general fast pick function
+ - button control. set x&y&text. w&h calculated from text. single default font.
+*/
 
 // ============== framework
 function l(...args) {
@@ -12,9 +17,6 @@ function l(...args) {
 }
 
 const CANVAS_NODE = Symbol("CanvasNode")
-const TEXT = Symbol("Text")
-const RECT = Symbol("Rect")
-const GROUP = Symbol("Group")
 
 class RenderState {
     constructor(prev) {
@@ -56,12 +58,6 @@ class NodeState {
 
 function Render(fun,props) {
     if(fun === CANVAS_NODE) return {type:"CANVAS_NODE",props:props}
-    // if(fun === GROUP) {
-    //     return {
-    //         type:"GROUP",
-    //         props:props,
-    //     }
-    // }
     // l(`call '${fun.name}' `,props)
     RENDER_STATE.push(new NodeState(fun.name))
     let ret = fun(props)
@@ -81,7 +77,6 @@ function findProp(node, name) {
     }
     return undefined
 }
-
 
 function RenderTree(prev,fun,props) {
     RENDER_STATE = new RenderState(prev)
@@ -140,12 +135,6 @@ function Group({x=0, y=0, children=[]}) {
 // ========= canvas specific code =====
 function draw_node(canvas,c,node) {
     if(node.props.render) return node.props.render(c,canvas)
-    if(node.type === "GROUP") {
-        c.save()
-        c.translate(node.props.x,node.props.y)
-        node.props.children.forEach(ch => draw_node(canvas,c,ch))
-        c.restore()
-    }
 }
 
 function draw_canvas(canvas,results) {
