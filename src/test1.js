@@ -11,6 +11,7 @@ function l(...args) {
     console.log("LOG",...args)
 }
 
+const CANVAS_NODE = Symbol("CanvasNode")
 const TEXT = Symbol("Text")
 const RECT = Symbol("Rect")
 const GROUP = Symbol("Group")
@@ -54,24 +55,13 @@ class NodeState {
 }
 
 function Render(fun,props) {
-    if(fun === TEXT) {
-        return {
-            type:"TEXT",
-            props:props
-        }
-    }
-    if(fun === RECT) {
-        return {
-            type:"RECT",
-            props:props,
-        }
-    }
-    if(fun === GROUP) {
-        return {
-            type:"GROUP",
-            props:props,
-        }
-    }
+    if(fun === CANVAS_NODE) return {type:"CANVAS_NODE",props:props}
+    // if(fun === GROUP) {
+    //     return {
+    //         type:"GROUP",
+    //         props:props,
+    //     }
+    // }
     // l(`call '${fun.name}' `,props)
     RENDER_STATE.push(new NodeState(fun.name))
     let ret = fun(props)
@@ -119,73 +109,37 @@ function useState(val) {
 }
 
 function Text({title, click=null}) {
-    return Render(TEXT, {text:title, click})
+    return Render(CANVAS_NODE, {
+        text:title,
+        click,
+        render:(ctx,canvas)=>{
+            ctx.font = '16px sans-serif'
+            ctx.fillStyle = 'black'
+            ctx.fillText(title,20,30)
+        }
+    })
 }
-
 function Rect({x=0,y=0,w=10,h=10,fill='red'}) {
-    return Render(RECT,{x,y,w,h,fill})
+    return Render(CANVAS_NODE,{x,y,w,h,fill,
+        render:(ctx,canvas)=>{
+            ctx.fillStyle = fill
+            ctx.fillStyle = fill
+            ctx.fillRect(x,y,w,h)
+        }})
 }
 function Group({x=0, y=0, children=[]}) {
-    return Render(GROUP,{x,y,children})
+    return Render(CANVAS_NODE,{x,y,children,
+        render:(ctx,canvas)=>{
+            ctx.save()
+            ctx.translate(x,y)
+            children.forEach(ch => draw_node(canvas,ctx,ch))
+            ctx.restore()
+        }})
 }
 
-
-
-// ========= user code ================
-
-// function greetings({title}) {
-// 	return Render(Text,{title:`Greetings ${title}`})
-// }
-
-
-//const FOO = new EventSource()
-
-/*function greetings({title}) {
-  const [foo, setFoo] useState(()=>"foo")
-  useEffect(()=> {
-     const stuff = () => setFoo("bar")
-     FOO.on("change",stuff)
-     return () => FOO.off(stuff)
-  })
-	return render(text,{title:`Greetings ${title}`})
-}
-*/
-
-
-function greetings({title, w=30, h=30}) {
-    const [foo, setFoo] = useState(()=>"foo")
-    return Render(Group,{
-        x:20,
-        y:20,
-        children:[
-            Render(background, {w,h}),
-            Render(Text,{
-                title:`Greetings ${title} and foo=${foo}`,
-                click:()=>setFoo((foo==="bar")?"foo":"bar")
-            }),
-        ]
-    })
-}
-
-function background({w=100,h=100}) {
-    return Render(Rect,{
-        x:5,
-        y:5,
-        w:w,
-        h:h,
-    })
-}
-
+// ========= canvas specific code =====
 function draw_node(canvas,c,node) {
-    if(node.type === 'TEXT') {
-        c.font = '16px sans-serif'
-        c.fillStyle = 'black'
-        c.fillText(node.props.text,20,30)
-    }
-    if(node.type === 'RECT') {
-        c.fillStyle = node.props.fill
-        c.fillRect(node.props.x,node.props.y,node.props.w,node.props.h)
-    }
+    if(node.props.render) return node.props.render(c,canvas)
     if(node.type === "GROUP") {
         c.save()
         c.translate(node.props.x,node.props.y)
@@ -219,7 +173,33 @@ function browserToCanvas(e) {
     return pt.subtract(new Point(rect.x,rect.y))
 }
 
-{
+// ========= user code ================
+
+function greetings({title, w=30, h=30}) {
+    const [foo, setFoo] = useState(()=>"foo")
+    return Render(Group,{
+        x:20,
+        y:20,
+        children:[
+            Render(background, {w,h}),
+            Render(Text,{
+                title:`Greetings ${title} and foo=${foo}`,
+                click:()=>setFoo((foo==="bar")?"foo":"bar")
+            }),
+        ]
+    })
+}
+
+function background({w=100,h=100}) {
+    return Render(Rect,{
+        x:5,
+        y:5,
+        w:w,
+        h:h,
+    })
+}
+
+async function start() {
     const $ = (sel) => document.querySelector(sel)
     const on = (el,type,cb) => el.addEventListener(type,cb)
 
@@ -234,4 +214,5 @@ function browserToCanvas(e) {
         }
     })
 }
+start().then(()=>console.log("started"))
 
