@@ -51,9 +51,17 @@ class Effects {
 class NodeState {
     private readonly _states:States
     private readonly _effects: Effects;
+    name: string;
+    child_index: number;
+    children: NodeState[]
+    elem: NodeElement | null;
     constructor() {
         this._states = new States()
         this._effects = new Effects()
+        this.name = "unknown"
+        this.child_index = -1
+        this.children = []
+        this.elem = null
     }
 
     states():States {
@@ -66,32 +74,63 @@ class NodeState {
 interface TreeState {
 }
 interface NodeElement {
+    type:string
+    props:any
 }
 type RComp = (props:any) => NodeElement
 type Lam = ()=> any
 
 class Result {
-    private _current:NodeState
     private _tree: NodeElement;
+    private _stack: NodeState[];
     constructor() {
-        this._current = null
+        this._stack = []
+        let top = new NodeState()
+        this._stack.push(top)
     }
     start_node(fun:RComp): void {
         // @ts-ignore
         l("starting comp",fun.name)
-        this._current = new NodeState()
+        let parent = this.current()
+        parent.child_index += 1
+        let current = new NodeState()
+        current.name = fun.name
+        this._stack.push(current)
+        parent.children.push(current)
+        l("full path is",this._calc_path())
     }
 
     end_node(ret: NodeElement) {
         l("ending comp",ret)
-        this._tree = ret
+        let cur = this.current()
+        cur.elem = ret
+        //fix parent
+        this._stack.pop()
+        let parent = this.current()
+        // console.log("parent is",parent)
+        // l("parent is",this._stack[this._stack.length-1])
     }
 
     current():NodeState {
-        return this._current
+        return this._stack[this._stack.length-1]
     }
     tree():NodeElement {
-        return this._tree
+        return this._stack[0].children[0].elem
+    }
+
+    private _calc_path() {
+        let path = ""
+        for(let n of this._stack) {
+            let ns:NodeState = n
+            path += ":"+ns.name +"["+ns.child_index+"]"
+        }
+        return path
+    }
+
+    dump() {
+        console.log('state. tree',this._tree)
+        console.log("state. stack",this._stack)
+        console.log("============")
     }
 }
 
@@ -99,6 +138,7 @@ let RESULT:Result = null
 function RT(old:Result|null,fun:RComp|string):Result {
     RESULT = new Result()
     RE(fun,{})
+    // RESULT.dump()
     return RESULT
 }
 
@@ -110,6 +150,7 @@ function RE(fun:RComp|string,props={}) {
     let ret = (fun as RComp)(props)
     if(!ret) throw new Error(`function ${fun} returns empty`)
     RESULT.end_node(ret)
+    return ret
 }
 
 
@@ -158,6 +199,29 @@ function useEffect(l:Lam):void {
     },two_levels.name)
 }
 
+{
+    const line:RComp = ({name="what?"}) => {
+        return RE("text",{text:name})
+    }
+    const two_fun_levels:RComp = () => {
+        return RE("group",{
+            children:[
+                RE(line,{name:"foo"}),
+                RE(line,{name:"bar"}),
+            ]
+        })
+    }
+    deepStrictEqual(RT(null, two_fun_levels).tree(), {
+        type:"group",
+        props:{
+            children:[
+                {type: "text", props: {text: "foo"}},
+                {type: "text", props: {text: "bar"}},
+            ]
+        },
+    },two_fun_levels.name)
+}
+
 
 {
     const with_click:RComp = () => {
@@ -176,3 +240,12 @@ function useEffect(l:Lam):void {
 
 }
 
+
+/*
+
+manually find and execute the on_click by searching for the node by ID
+then render again and see if its updated correctly. number in text should be updated
+
+then again when two levels deep. number in text should be updated
+
+ */
