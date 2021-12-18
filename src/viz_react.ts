@@ -2,6 +2,7 @@
 export interface NodeElement {
     type:string
     props:any
+    parent:NodeElement|null
     children:NodeElement[]
 }
 export type RComp = (props:any) => NodeElement
@@ -111,9 +112,12 @@ class Result {
         // l("ending comp",ret)
         let cur = this.current()
         cur.elem = ret
+        cur.elem.children.forEach(ch => {
+            ch.parent = cur.elem
+        })
         //fix parent
         this._stack.pop()
-        let parent = this.current()
+        // let parent = this.current()
         // console.log("parent is",parent)
         // l("parent is",this._stack[this._stack.length-1])
     }
@@ -149,9 +153,9 @@ export function renderTree(old:Result|null, fun:RComp|string):Result {
     return GLOBAL_STATE
 }
 
-export function renderElement(fun:RComp|string, props={}, children=[]) {
+export function renderElement(fun:RComp|string, props={}, children=[]):NodeElement {
     if(typeof fun === 'string') {
-        return { type:fun, props, children:children}
+        return { type:fun, props, children:children, parent:null}
     }
     GLOBAL_STATE.start_node(fun as RComp)
     let ret = (fun as RComp)(props)
