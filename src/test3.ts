@@ -19,25 +19,11 @@ function browserToCanvas(e) {
 }
 
 
-const RENDERERS = {
-    "group":(ctx,node,canvas)=>{
-        ctx.save()
-        // ctx.translate(node.props.x,node.props.y)
-        node.children.forEach(ch => draw_node(canvas,ctx,ch))
-        ctx.restore()
-    }
-}
-
-function draw_node(canvas:HTMLCanvasElement,c:CanvasRenderingContext2D,node:NodeElement) {
-    if(RENDERERS[node.type]) RENDERERS[node.type](c,node,canvas)
-    if(node.props.render) return node.props.render(c)
-}
 function draw_canvas(canvas: any, root:NodeElement) {
-    // console.log('drawing canvas',root)
     let c = canvas.getContext('2d')
     c.fillStyle = '#f0f0f0'
     c.fillRect(0,0,canvas.width,canvas.height)
-    draw_node(canvas,c,root)
+    if(root.props.render) return root.props.render(c)
 }
 
 const RECT:RComp = ({x,y,w,h,fill}) => {
@@ -54,9 +40,26 @@ const TEXT:RComp = ({x,y,text}) => {
             c.fillText(text,20,30)
         }})
 }
+const GROUP:RComp = ({x=0,y=0,...rest},children:any):NodeElement => {
+    return renderElement("generic",{
+        x,y,...rest,
+        render:c => {
+            c.save()
+            c.translate(x,y)
+            children.forEach(ch => {
+                if(ch.props.render) return ch.props.render(c)
+            })
+            c.restore()
+        }
+    },children)
+}
 
 
 function find_node_at_point(pt: Point, root: NodeElement):NodeElement|null {
+    for(let ch of root.children) {
+        let res = find_node_at_point(pt,ch)
+        if(res) return res
+    }
     if(root.type==='bounds') {
         if(pt.x < root.props.x) return null
         if(pt.y < root.props.y) return null
@@ -64,10 +67,13 @@ function find_node_at_point(pt: Point, root: NodeElement):NodeElement|null {
         if(pt.y > root.props.y + root.props.h) return null
         return root
     }
-    for(let ch of root.children) {
-        let res = find_node_at_point(pt,ch)
-        if(res) return res
-    }
+    return null
+}
+
+function find_node_or_parent_with_prop(root: NodeElement, name: string) {
+    if(!root) return null
+    if(root.props.hasOwnProperty(name)) return root
+    if(root.parent) return find_node_or_parent_with_prop(root.parent,name)
     return null
 }
 
@@ -77,18 +83,26 @@ async function start() {
 
     const Button:RComp = ({id,text="empty"}) => {
         const [active, setActive] = useState(()=>false)
-        return renderElement("group", {
+        const [hover, setHover] = useState(()=>false)
+        let fill = "blue"
+        if(active) fill = "aqua"
+        if(hover) fill = "yellow"
+        return renderElement(GROUP, {
+            x:0,
             id,
             on_click: () => {
                 setActive(!active)
             },
+            on_mousemove:(pt) => {
+                setHover(true)
+            }
         },[
-            renderElement(RECT,{x:0,y:0,w:40,h:40,fill:(active)?"aqua":"blue"}),
+            renderElement(RECT,{x:0,y:0,w:40,h:40,fill:fill}),
             renderElement(TEXT,{x:10,y:10,text:text}),
         ])
     }
     const with_button:RComp = () => {
-        return renderElement("group",{},[
+        return renderElement(GROUP,{},[
             renderElement(Button,{id:"foo",text:"foo"}),
         ])
     }
@@ -103,22 +117,21 @@ async function start() {
     }
     on(canvas,'click',(e) => {
         let pt = browserToCanvas(e)
-        console.log("clicked at",pt)
         let target = find_node_at_point(pt,results.tree())
-        console.log("target is",target)
-        if(target) {
-            if(target.props.on_click) {
-                target.props.on_click()
-            } else {
-                console.log("target doesn't have click. check parent")
-                if(target.parent.props.on_click) {
-                    target.parent.props.on_click()
-                    redraw()
-                }
-            }
+        target = find_node_or_parent_with_prop(target,"on_click")
+        if(target && target.props.on_click) {
+            target.props.on_click()
+            redraw()
         }
-        // results = renderTree(results,with_button)
-        // draw_canvas(canvas,results.tree())
+    })
+    on(canvas,'mousemove',(e)=>{
+        let pt = browserToCanvas(e)
+        let target = find_node_at_point(pt,results.tree())
+        target = find_node_or_parent_with_prop(target, "on_mousemove")
+        if(target) {
+            target.props.on_mousemove(e)
+            redraw()
+        }
     })
     redraw()
 }

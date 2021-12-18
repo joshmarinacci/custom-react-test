@@ -5,7 +5,7 @@ export interface NodeElement {
     parent:NodeElement|null
     children:NodeElement[]
 }
-export type RComp = (props:any) => NodeElement
+export type RComp = (props:any,...children) => NodeElement
 export type Lam = ()=> any
 
 type UseStateResult = [any,any]
@@ -157,7 +157,7 @@ export function renderElement(fun:RComp|string, props={}, children=[]):NodeEleme
         return { type:fun, props, children:children, parent:null}
     }
     GLOBAL_STATE.start_node(fun as RComp)
-    let ret = (fun as RComp)(props)
+    let ret = (fun as RComp)(props,children)
     if(!ret) throw new Error(`function ${fun} returns empty`)
     GLOBAL_STATE.end_node(ret)
     return ret
