@@ -1,6 +1,6 @@
 import {deepStrictEqual} from "assert"
 import * as util from "util";
-import {NodeElement, RComp, RE, RT, useState} from "./viz_react.js";
+import {NodeElement, RComp, renderElement, renderTree, useState} from "./viz_react.js";
 
 function clean(node: object) {
     let obj = {}
@@ -36,28 +36,28 @@ function check(A:any,B:any, message?) {
 }
 {
     const simple: RComp = () => {
-        return RE("text", {text: "hi"})
+        return renderElement("text", {text: "hi"})
     }
-    check(RT(null, simple).tree(), {type: "text", props: {text: "hi"}},'simple')
+    check(renderTree(null, simple).tree(), {type: "text", props: {text: "hi"}},'simple')
 }
 
 {
     const with_state: RComp = () => {
         const [name, set_name] = useState(() => "bob")
-        return RE("text", {text: `hi ${name}`})
+        return renderElement("text", {text: `hi ${name}`})
     }
-    check(RT(null, with_state).tree(), {type: "text", props: {text: "hi bob"}},'with state')
+    check(renderTree(null, with_state).tree(), {type: "text", props: {text: "hi bob"}},'with state')
 }
 
 {
     const two_levels:RComp = () => {
-        return RE("group",{},[
-                RE("text",{text:"foo"}),
-                RE("text",{text:"bar"}),
+        return renderElement("group",{},[
+                renderElement("text",{text:"foo"}),
+                renderElement("text",{text:"bar"}),
             ]
         )
     }
-    check(RT(null, two_levels).tree(), {
+    check(renderTree(null, two_levels).tree(), {
         type:"group",
         props:{ },
         children:[
@@ -69,16 +69,16 @@ function check(A:any,B:any, message?) {
 
 {
     const line:RComp = ({name="what?"}) => {
-        return RE("text",{text:name})
+        return renderElement("text",{text:name})
     }
     const two_fun_levels:RComp = () => {
-        return RE("group",{},[
-                RE(line,{name:"foo"}),
-                RE(line,{name:"bar"}),
+        return renderElement("group",{},[
+                renderElement(line,{name:"foo"}),
+                renderElement(line,{name:"bar"}),
             ]
         )
     }
-    check(RT(null, two_fun_levels).tree(), {
+    check(renderTree(null, two_fun_levels).tree(), {
         type:"group",
         props:{
         },
@@ -91,20 +91,20 @@ function check(A:any,B:any, message?) {
 
 {
     const line:RComp = ({name="what?"}) => {
-        return RE("text",{text:name})
+        return renderElement("text",{text:name})
     }
     const two_fun_levels:RComp = () => {
-        return RE("group",{},
+        return renderElement("group",{},
                 [
-                RE(line,{name:"foo"}),
-                RE(line,{name:"bar"}),
+                renderElement(line,{name:"foo"}),
+                renderElement(line,{name:"bar"}),
             ]
         )
     }
     const three_fun_levels:RComp = () => {
-        return RE(two_fun_levels)
+        return renderElement(two_fun_levels)
     }
-    check(RT(null,three_fun_levels).tree(),{
+    check(renderTree(null,three_fun_levels).tree(),{
         type:"group",
         props:{
         },
@@ -121,17 +121,17 @@ function check(A:any,B:any, message?) {
     const with_click:RComp = () => {
         const [name, set_name] = useState(() => "bob")
         const [count, set_count] = useState(()=>1)
-        return RE("text", {id:"tb",text: `hi ${name} ${count} times`,on_click:()=>{
+        return renderElement("text", {id:"tb",text: `hi ${name} ${count} times`,on_click:()=>{
             set_name("bill")
             set_count(count+1)
         }})
     }
-    let state1 = RT(null, with_click)
+    let state1 = renderTree(null, with_click)
     check(state1.tree(),
         {type:"text", props:{id:"tb", text:"hi bob 1 times"}}
         ,'with_click')
     find_by_id(state1.tree(),"tb").props.on_click()
-    let state2 = RT(state1,with_click)
+    let state2 = renderTree(state1,with_click)
     check(state2.tree(),
         {type:"text",props:{id:"tb",text:"hi bill 2 times"}})
 
@@ -142,23 +142,23 @@ function check(A:any,B:any, message?) {
         const [active, setActive] = useState(()=>1)
         console.log("rendering Button with active = ",active)
 
-        return RE("group", {
+        return renderElement("group", {
             id,
             on_click: () => {
                 console.log("onclick happening")
                 setActive(2)
             },
         },[
-                RE("rect",{x:0,y:0,w:40,h:40,fill:(active===1)?"aqua":"blue"}),
-                RE("text",{x:10,y:10,text:text}),
+                renderElement("rect",{x:0,y:0,w:40,h:40,fill:(active===1)?"aqua":"blue"}),
+                renderElement("text",{x:10,y:10,text:text}),
             ])
     }
     const with_button:RComp = () => {
-        return RE("group",{},[
-            RE(Button,{id:"foo",text:"foo"}),
+        return renderElement("group",{},[
+            renderElement(Button,{id:"foo",text:"foo"}),
         ])
     }
-    let state1 = RT(null, with_button)
+    let state1 = renderTree(null, with_button)
     // console.log("doing here")
     // console.log(util.inspect(state1.tree(),{depth:10}))
     check(state1.tree(),{
@@ -177,7 +177,7 @@ function check(A:any,B:any, message?) {
     },'with_button')
 
     find_by_id(state1.tree(),"foo").props.on_click()
-    let state2 = RT(state1,with_button)
+    let state2 = renderTree(state1,with_button)
 
     check(state2.tree(),{
         type:'group',

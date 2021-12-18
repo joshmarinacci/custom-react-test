@@ -141,31 +141,30 @@ class Result {
     }
 }
 
-let RESULT:Result = null
-export function RT(old:Result|null,fun:RComp|string):Result {
-    RESULT = new Result(old)
-    RE(fun,{})
+let GLOBAL_STATE:Result = null
+export function renderTree(old:Result|null, fun:RComp|string):Result {
+    GLOBAL_STATE = new Result(old)
+    renderElement(fun,{})
     // RESULT.dump()
-    return RESULT
+    return GLOBAL_STATE
 }
 
-export function RE(fun:RComp|string,props={},children=[]) {
+export function renderElement(fun:RComp|string, props={}, children=[]) {
     if(typeof fun === 'string') {
         return { type:fun, props, children:children}
     }
-    RESULT.start_node(fun as RComp)
+    GLOBAL_STATE.start_node(fun as RComp)
     let ret = (fun as RComp)(props)
     if(!ret) throw new Error(`function ${fun} returns empty`)
-    RESULT.end_node(ret)
+    GLOBAL_STATE.end_node(ret)
     return ret
 }
 
 
-
 export function useState(l:Lam):UseStateResult {
-    return RESULT.current().states().next(l)
+    return GLOBAL_STATE.current().states().next(l)
 }
 export function useEffect(l:Lam):void {
-    return RESULT.current().effects().next(l)
+    return GLOBAL_STATE.current().effects().next(l)
 }
 
