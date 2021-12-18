@@ -11,6 +11,14 @@ function clean(node: object) {
     })
     return obj
 }
+function find_by_id(root: NodeElement, id: string) {
+    if(root.props.id && root.props.id === id) return root
+    for(let ch of root.props.children) {
+        let match = find_by_id(ch,id)
+        if(match) return match
+    }
+    return undefined
+}
 function l(...args: any) {
     console.log(...args)
 }
@@ -25,11 +33,20 @@ class States {
     }
     next(l: Lam):UseStateResult {
         this.index++
-        let state = this.states[this.index]
+        let n = this.index
+        let state = this.states[n]
         if(!state) state = l()
-        let set_state = () => {
+        let set_state = (v) => {
+            console.log("set state called with value",v)
+            this.states[n] = v
         }
         return [state,set_state]
+    }
+
+    clone() {
+        let states = new States()
+        states.states = this.states.slice()
+        return states
     }
 }
 class Effects {
@@ -55,13 +72,19 @@ class NodeState {
     child_index: number;
     children: NodeState[]
     elem: NodeElement | null;
-    constructor() {
+    _old: NodeState | null;
+    constructor(old:NodeState|null) {
+        this._old = old
         this._states = new States()
         this._effects = new Effects()
         this.name = "unknown"
         this.child_index = -1
         this.children = []
         this.elem = null
+        if(old) {
+            console.log("matching with previous node state")
+            this._states = old._states.clone()
+        }
     }
 
     states():States {
@@ -83,21 +106,33 @@ type Lam = ()=> any
 class Result {
     private _tree: NodeElement;
     private _stack: NodeState[];
-    constructor() {
+    private _old: Result;
+
+    constructor(old: Result) {
+        this._old = old
         this._stack = []
-        let top = new NodeState()
-        this._stack.push(top)
+        if(this._old) {
+            this._stack.push(new NodeState(old._stack[0]))
+        } else {
+            this._stack.push(new NodeState(null))
+        }
     }
+
     start_node(fun:RComp): void {
         // @ts-ignore
         l("starting comp",fun.name)
         let parent = this.current()
         parent.child_index += 1
-        let current = new NodeState()
+        let current:NodeState = null
+        if(this._old) {
+            current = new NodeState(parent._old.children[parent.child_index])
+        } else {
+            current = new NodeState(null)
+        }
         current.name = fun.name
         this._stack.push(current)
         parent.children.push(current)
-        l("full path is",this._calc_path())
+        // l("full path is",this._calc_path())
     }
 
     end_node(ret: NodeElement) {
@@ -136,7 +171,7 @@ class Result {
 
 let RESULT:Result = null
 function RT(old:Result|null,fun:RComp|string):Result {
-    RESULT = new Result()
+    RESULT = new Result(old)
     RE(fun,{})
     // RESULT.dump()
     return RESULT
@@ -222,21 +257,49 @@ function useEffect(l:Lam):void {
     },two_fun_levels.name)
 }
 
+{
+    const line:RComp = ({name="what?"}) => {
+        return RE("text",{text:name})
+    }
+    const two_fun_levels:RComp = () => {
+        return RE("group",{
+            children:[
+                RE(line,{name:"foo"}),
+                RE(line,{name:"bar"}),
+            ]
+        })
+    }
+    const three_fun_levels:RComp = () => {
+        return RE(two_fun_levels)
+    }
+    deepStrictEqual(RT(null,three_fun_levels).tree(),{
+        type:"group",
+        props:{
+            children:[
+                {type: "text", props: {text: "foo"}},
+                {type: "text", props: {text: "bar"}},
+            ]
+        },
+    },three_fun_levels.name)
+}
+
+
 
 {
     const with_click:RComp = () => {
         const [name, set_name] = useState(() => "bob")
         const [count, set_count] = useState(()=>1)
         l("rendering with click",name,count)
-        return RE("text", {text: `hi ${name} ${count} times`,on_click:()=>{
+        return RE("text", {id:"tb",text: `hi ${name} ${count} times`,on_click:()=>{
             set_name("bill")
             set_count(count+1)
         }})
     }
     let state1 = RT(null, with_click)
-    deepStrictEqual(clean(state1.tree()),{type:"text", props:{text:"hi bob 1 times"}},'with_click')
-    // let state2 = RT(state1,with_click)
-    // assert_deep_equals(state2.tree,{type:"text",props:{text:"hi bill 2 times"}})
+    deepStrictEqual(clean(state1.tree()),{type:"text", props:{id:"tb", text:"hi bob 1 times"}},'with_click')
+    find_by_id(state1.tree(),"tb").props.on_click()
+    let state2 = RT(state1,with_click)
+    deepStrictEqual(clean(state2.tree()),{type:"text",props:{id:"tb",text:"hi bill 2 times"}})
 
 }
 
