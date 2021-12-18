@@ -1,4 +1,5 @@
 import {deepStrictEqual} from "assert"
+import * as util from "util";
 
 function clean(node: object) {
     let obj = {}
@@ -6,7 +7,12 @@ function clean(node: object) {
     Object.keys(node).forEach(key => {
         if(skip.includes(key))return
         let val = node[key]
-        if(typeof val === 'object') val = clean(val)
+        // console.log("val is",key,Array.isArray(val), val)
+        if(Array.isArray(val)) {
+            val = val.map(v => clean(v))
+        } else if(typeof val === 'object') {
+            val = clean(val)
+        }
         obj[key] = val
     })
     return obj
@@ -120,7 +126,7 @@ class Result {
 
     start_node(fun:RComp): void {
         // @ts-ignore
-        l("starting comp",fun.name)
+        // l("starting comp",fun.name)
         let parent = this.current()
         parent.child_index += 1
         let current:NodeState = null
@@ -136,7 +142,7 @@ class Result {
     }
 
     end_node(ret: NodeElement) {
-        l("ending comp",ret)
+        // l("ending comp",ret)
         let cur = this.current()
         cur.elem = ret
         //fix parent
@@ -289,7 +295,6 @@ function useEffect(l:Lam):void {
     const with_click:RComp = () => {
         const [name, set_name] = useState(() => "bob")
         const [count, set_count] = useState(()=>1)
-        l("rendering with click",name,count)
         return RE("text", {id:"tb",text: `hi ${name} ${count} times`,on_click:()=>{
             set_name("bill")
             set_count(count+1)
@@ -303,12 +308,75 @@ function useEffect(l:Lam):void {
 
 }
 
+{
+    const Button:RComp = ({id,text="empty"}) => {
+        const [active, setActive] = useState(()=>1)
+        console.log("rendering Button with active = ",active)
+
+        return RE("group",{
+            id,
+            on_click:()=> {
+              console.log("onclick happening")
+                setActive(2)
+            },
+            children:[
+                RE("rect",{x:0,y:0,w:40,h:40,fill:(active===1)?"aqua":"blue"}),
+                RE("text",{x:10,y:10,text:text}),
+            ]})
+    }
+    const with_button:RComp = () => {
+        return RE("group",{children:[
+            RE(Button,{id:"foo",text:"foo"}),
+        ]})
+    }
+    let state1 = RT(null, with_button)
+    // console.log("doing here")
+    console.log(util.inspect(state1.tree(),{depth:10}))
+    deepStrictEqual(clean(state1.tree()),{
+        type:'group',
+        props:{
+            children:[
+                {
+                    type:"group",
+                    props:{
+                        id:"foo",
+                        children:[
+                            {type:"rect",props:{x:0,y:0,w:40,h:40,fill:"aqua"} },
+                            {type:"text",props:{x:10,y:10, text:"foo"} },
+                        ]
+                    }
+                },
+            ]
+        },
+    },'with_button')
+
+    find_by_id(state1.tree(),"foo").props.on_click()
+    let state2 = RT(state1,with_button)
+
+    deepStrictEqual(clean(state2.tree()),{
+        type:'group',
+        props:{
+            children:[
+                {
+                    type:"group",
+                    props:{
+                        id:"foo",
+                        children:[
+                            {type:"rect",props:{x:0,y:0,w:40,h:40,fill:"blue"} },
+                            {type:"text",props:{x:10,y:10, text:"foo"} },
+                        ]
+                    }
+                },
+            ]
+        },
+    },'with_button')
+}
+
 
 /*
 
-manually find and execute the on_click by searching for the node by ID
-then render again and see if its updated correctly. number in text should be updated
-
-then again when two levels deep. number in text should be updated
+//manually find and execute the on_click by searching for the node by ID
+//then render again and see if its updated correctly. number in text should be updated
+//then again when two levels deep. number in text should be updated
 
  */
