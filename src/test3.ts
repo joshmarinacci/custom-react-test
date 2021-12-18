@@ -85,8 +85,8 @@ async function start() {
         const [active, setActive] = useState(()=>false)
         const [hover, setHover] = useState(()=>false)
         let fill = "blue"
-        if(active) fill = "aqua"
         if(hover) fill = "yellow"
+        if(active) fill = "aqua"
         return renderElement(GROUP, {
             x:0,
             id,
@@ -137,3 +137,15 @@ async function start() {
 }
 start().then(()=>console.log("started"))
 
+
+/*
+
+make events work inside a translated group
+make button that can size itself based on the text and a global font size
+make three buttons w/ backgrounds and borders and text
+make button increase and decrease global font scale
+
+when you click a button make it print to the console
+when you click a button make it animate away. needs animation object and an anim engine hooks to the canvas renderer
+
+ */
