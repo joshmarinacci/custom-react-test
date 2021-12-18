@@ -19,10 +19,9 @@ class States {
     next(lam: Lam):UseStateResult {
         this.index++
         let n = this.index
-        let state = this.states[n]
-        if(!state) state = lam()
-        let set_state = (v) => this.states[n] = v
-        return [state,set_state]
+        if(!this.states[n]) this.states[n] = { value:lam() }
+        let set_state = (v) => this.states[n].value = v
+        return [this.states[n].value,set_state]
     }
 
     clone() {

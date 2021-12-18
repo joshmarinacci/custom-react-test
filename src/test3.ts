@@ -22,7 +22,6 @@ function browserToCanvas(e) {
 const RENDERERS = {
     "group":(ctx,node,canvas)=>{
         ctx.save()
-        console.log("node is group is",node)
         // ctx.translate(node.props.x,node.props.y)
         node.children.forEach(ch => draw_node(canvas,ctx,ch))
         ctx.restore()
@@ -34,7 +33,7 @@ function draw_node(canvas:HTMLCanvasElement,c:CanvasRenderingContext2D,node:Node
     if(node.props.render) return node.props.render(c)
 }
 function draw_canvas(canvas: any, root:NodeElement) {
-    console.log('drawing canvas',root)
+    // console.log('drawing canvas',root)
     let c = canvas.getContext('2d')
     c.fillStyle = '#f0f0f0'
     c.fillRect(0,0,canvas.width,canvas.height)
@@ -77,17 +76,14 @@ async function start() {
     const on = (el,type,cb) => el.addEventListener(type,cb)
 
     const Button:RComp = ({id,text="empty"}) => {
-        const [active, setActive] = useState(()=>1)
-        console.log("rendering Button with active = ",active)
-
+        const [active, setActive] = useState(()=>false)
         return renderElement("group", {
             id,
             on_click: () => {
-                console.log("onclick happening")
-                setActive(2)
+                setActive(!active)
             },
         },[
-            renderElement(RECT,{x:0,y:0,w:40,h:40,fill:(active===1)?"aqua":"blue"}),
+            renderElement(RECT,{x:0,y:0,w:40,h:40,fill:(active)?"aqua":"blue"}),
             renderElement(TEXT,{x:10,y:10,text:text}),
         ])
     }
