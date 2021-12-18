@@ -2,6 +2,7 @@
 export interface NodeElement {
     type:string
     props:any
+    children:NodeElement[]
 }
 export type RComp = (props:any) => NodeElement
 export type Lam = ()=> any
@@ -148,9 +149,9 @@ export function RT(old:Result|null,fun:RComp|string):Result {
     return RESULT
 }
 
-export function RE(fun:RComp|string,props={}) {
+export function RE(fun:RComp|string,props={},children=[]) {
     if(typeof fun === 'string') {
-        return { type:fun, props}
+        return { type:fun, props, children:children}
     }
     RESULT.start_node(fun as RComp)
     let ret = (fun as RComp)(props)
